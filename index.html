@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My Offline MP3 Player</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1b1026">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>My Offline MP3 Player</h1>
+    <button id="installBtn" class="hidden">Install</button>
+  </header>
+
+  <main>
+    <section class="uploader">
+      <input id="fileInput" type="file" accept="audio/*" multiple hidden>
+      <button id="pickFiles">Add Songs</button>
+      <p class="hint">Tip: Use the Files app to pick MP3s/FLAC/AAC. They’ll be saved for offline use.</p>
+    </section>
+
+    <section class="now-playing">
+      <div id="npTitle">Nothing playing</div>
+      <div class="controls">
+        <button id="prevBtn">⏮</button>
+        <button id="playPauseBtn">▶️</button>
+        <button id="nextBtn">⏭</button>
+      </div>
+      <input id="seek" type="range" min="0" max="100" value="0">
+      <div class="time">
+        <span id="cur">0:00</span>
+        <span id="dur">0:00</span>
+      </div>
+      <audio id="player" preload="metadata" playsinline></audio>
+    </section>
+
+    <section class="library">
+      <h2>Your Library</h2>
+      <ul id="trackList"></ul>
+      <button id="clearBtn" class="danger">Clear Library</button>
+    </section>
+  </main>
+
+  <footer>
+    <small>Private, ad-free, offline. Your songs stay on this device.</small>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
