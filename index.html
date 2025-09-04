@@ -18,6 +18,7 @@ main{padding:16px;max-width:1100px;margin:0 auto}
 .now-playing-card{background:var(--panel);border-radius:14px;padding:14px;margin-bottom:16px}
 .controls{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
 #seek{width:100%;accent-color:#aaa}.time{display:flex;justify-content:space-between;opacity:.9}
+.toolbar{display:flex;gap:8px;align-items:center;margin:8px 0}
 #trackList{list-style:none;padding:0;margin:0}#trackList li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px;border-bottom:1px solid #38214d}
 .track{display:flex;flex-direction:column;gap:2px}.title{font-weight:600}.meta{opacity:.7;font-size:12px;color:var(--mut)}
 .row-btns{display:flex;gap:6px;flex-wrap:wrap}
@@ -83,7 +84,9 @@ button:hover,.btn:hover{background:var(--btnH)}button:active,.btn:active{backgro
       <audio id="player" preload="metadata" playsinline></audio>
     </section>
 
-    <h2>Tracks</h2>
+    <div class="toolbar">
+      <button id="sortBtn" title="Toggle sort order">Sort: A→Z</button>
+    </div>
     <ul id="trackList"></ul>
   </section>
 
@@ -163,6 +166,7 @@ let shuffle=false, shuffleQueue=[], shufflePointer=0;
 let currentMode={type:'all', name:null};
 let pendingSelectFor=null;
 let sessionQueue=[];
+let sortMode = localStorage.getItem('nbp-sort') || 'alpha'; // 'alpha' or 'added'
 
 /* ===== Elements ===== */
 const $=q=>document.querySelector(q);
@@ -210,13 +214,47 @@ function savePlaylist(name,trackIds){ return new Promise((res)=>{ const tx=db.tr
 function getPlaylist(name){ return new Promise((res)=>{ const tx=db.transaction(storePL,'readonly'); tx.objectStore(storePL).get(name).onsuccess=e=>res(e.target.result); }); }
 function deletePlaylist(name){ const tx=db.transaction(storePL,'readwrite'); tx.objectStore(storePL).delete(name).onsuccess=()=>loadPlaylists(); }
 
-/* ===== Render Library ===== */
-function renderTracks(){ const list=viewTracks.length?viewTracks:allTracks; const ul=$('#trackList'); ul.innerHTML=''; if(!list.length){ const li=document.createElement('li'); li.textContent='No songs yet. Tap “Add Songs” to import.'; ul.appendChild(li); return; }
-  list.forEach((t,idx)=>{ const li=document.createElement('li'); const left=document.createElement('div'); left.className='track'; const title=document.createElement('div'); title.className='title'; title.textContent=t.name; const meta=document.createElement('div'); meta.className='meta'; meta.textContent=`${t.type||'audio'} • ${humanSize(t.size)}`; left.appendChild(title); left.appendChild(meta);
-    const btns=document.createElement('div'); btns.className='row-btns'; const play=document.createElement('button'); play.textContent='Play'; play.onclick=()=>playAtIndex(idx,true); const add=document.createElement('button'); add.textContent='Add to playlist'; add.onclick=()=>addTrackToPlaylistPrompt(t.id);
+/* ===== Render Library with Sort Toggle ===== */
+function renderTracks(){
+  const list=viewTracks.length?viewTracks:allTracks;
+  const ul=$('#trackList'); ul.innerHTML='';
+  if(!list.length){ const li=document.createElement('li'); li.textContent='No songs yet. Tap “Add Songs” to import.'; ul.appendChild(li); return; }
+
+  // Apply sorting
+  let sorted = [...list];
+  if(sortMode==='alpha'){
+    sorted.sort((a,b)=>a.name.localeCompare(b.name, undefined, {sensitivity:'base'}));
+  } // else 'added' keeps import order
+
+  sorted.forEach((t,idx)=>{
+    const li=document.createElement('li');
+    const left=document.createElement('div'); left.className='track';
+    const title=document.createElement('div'); title.className='title'; title.textContent=t.name;
+    const meta=document.createElement('div'); meta.className='meta'; meta.textContent=`${t.type||'audio'} • ${humanSize(t.size)}`;
+    left.appendChild(title); left.appendChild(meta);
+    const btns=document.createElement('div'); btns.className='row-btns';
+    const play=document.createElement('button'); play.textContent='Play'; play.onclick=()=>{
+      // Map back to true index in current list
+      const realIndex = (viewTracks.length?viewTracks:allTracks).findIndex(x=>x.id===t.id);
+      playAtIndex(realIndex,true);
+    };
+    const add=document.createElement('button'); add.textContent='Add to playlist'; add.onclick=()=>addTrackToPlaylistPrompt(t.id);
     const del=document.createElement('button'); del.textContent='Delete'; del.onclick=()=>removeTrack(t.id);
     btns.appendChild(play); btns.appendChild(add); btns.appendChild(del);
-    li.appendChild(left); li.appendChild(btns); ul.appendChild(li); }); rebuildQueueFromMode(); updateCounts(); }
+    li.appendChild(left); li.appendChild(btns); ul.appendChild(li);
+  });
+
+  // Update sort button label
+  const sortBtn = document.getElementById('sortBtn');
+  sortBtn.textContent = sortMode==='alpha' ? 'Sort: A→Z' : 'Sort: Added';
+  rebuildQueueFromMode(); updateCounts();
+}
+
+document.getElementById('sortBtn').addEventListener('click', ()=>{
+  sortMode = sortMode==='alpha' ? 'added' : 'alpha';
+  localStorage.setItem('nbp-sort', sortMode);
+  renderTracks();
+});
 
 /* ===== Playlist Page / Detail ===== */
 function renderPlaylistPage(items){ const ul=$('#plPageList'); ul.innerHTML=''; if(!items.length){ const li=document.createElement('li'); li.textContent='No playlists yet.'; ul.appendChild(li); return; }
@@ -250,7 +288,7 @@ document.getElementById('selBack').addEventListener('click', ()=>{ show('#plPage
 
 /* ===== Shuffle & Queue ===== */
 function setShuffle(on){ shuffle=on; $('#shuffleBtn').textContent=shuffle?'🔀 Shuffle: On':'🔀 Shuffle: Off'; rebuildShuffleQueue(); rebuildQueueFromMode(); }
-function rebuildShuffleQueue(){ const list=(currentMode.type==='playlist'&&viewTracks.length)?viewTracks:allTracks; shuffleQueue=list.map((_,i)=>i); for(let i=shuffleQueue.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [shuffleQueue[i],shuffleQueue[j]]=[shuffleQueue[j],shuffleQueue[i]]; } shufflePointer=Math.max(0, shuffleQueue.indexOf(currentIndex)); }
+function rebuildShuffleQueue(){ const list=(currentMode.type==='playlist'&&viewTracks.length)?viewTracks:allTracks; shuffleQueue=list.map((_,i)=>i); for(let i=shuffleQueue.length-1;i>0;i--){ const j=Math.random()* (i+1) | 0; [shuffleQueue[i],shuffleQueue[j]]=[shuffleQueue[j],shuffleQueue[i]]; } shufflePointer=Math.max(0, shuffleQueue.indexOf(currentIndex)); }
 function rebuildQueueFromMode(){ const list=(currentMode.type==='playlist'&&viewTracks.length)?viewTracks:allTracks; sessionQueue=[]; if(list.length<=1) { renderQueue(); return; } if(shuffle){ if(shuffleQueue.length!==list.length) rebuildShuffleQueue(); for(let k=1;k<list.length;k++){ sessionQueue.push(shuffleQueue[(shufflePointer+k)%shuffleQueue.length]); } } else { for(let k=1;k<list.length;k++){ sessionQueue.push(((currentIndex<0?-1:currentIndex)+k)%list.length); } } renderQueue(); }
 
 /* ===== Queue UI + drag (temporary) ===== */
@@ -289,8 +327,5 @@ function updateCounts(){ document.getElementById('libCount').textContent = allTr
 /* ===== Init / Refresh ===== */
 async function refresh(){ await loadAllTracks(); viewTracks=[]; renderTracks(); await loadPlaylists(); updateCounts(); }
 if('serviceWorker' in navigator){ window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js')); }
-(async ()=>{ db=await openDB(); await refresh();
-  // Queue collapsed by default
-  queuePanel.classList.add('collapsed'); queueChevron.textContent='⌄';
-})();</script>
+(async ()=>{ db=await openDB(); await refresh(); queuePanel.classList.add('collapsed'); queueChevron.textContent='⌄';})();</script>
 </body></html>
