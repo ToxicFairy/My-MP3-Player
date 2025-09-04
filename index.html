@@ -7,33 +7,45 @@
 *{box-sizing:border-box}body{font-family:-apple-system,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#1b1026;color:#eee}
 header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#1b1026;border-bottom:2px solid #782052}
 h1{font-size:18px;margin:0;color:#782052}main{padding:16px;max-width:800px;margin:0 auto}
-button{border:0;padding:10px 14px;border-radius:10px;background:#782052;color:#fff;font-weight:600;transition:background .15s ease}
-button:hover{background:#9c2b6b}button:active{background:#5a173d}
-.hidden{display:none}.uploader{margin-bottom:16px}.hint{opacity:.7;font-size:12px}
+button, .btn{border:0;padding:10px 14px;border-radius:10px;background:#782052;color:#fff;font-weight:600;transition:background .15s ease;text-decoration:none;display:inline-block}
+button:hover, .btn:hover{background:#9c2b6b}button:active, .btn:active{background:#5a173d}
+.hidden{display:none}.uploader{margin-bottom:16px}.hint{opacity:.8;font-size:12px;line-height:1.4}
 .now-playing{background:#2a173b;border-radius:14px;padding:14px;margin-bottom:16px}
 .controls{display:flex;gap:8px;margin:8px 0}#seek{width:100%;accent-color:#aaaaaa}.time{display:flex;justify-content:space-between;opacity:.9}
 .library h2{margin:8px 0 6px 0;color:#aaaaaa}#trackList{list-style:none;padding:0;margin:0}
 #trackList li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px;border-bottom:1px solid #38214d}
 .track{display:flex;flex-direction:column;gap:2px}.title{font-weight:600}.meta{opacity:.7;font-size:12px;color:#aaaaaa}
 .row-btns{display:flex;gap:6px}footer{padding:12px 16px;opacity:.8;color:#aaaaaa;border-top:2px solid #782052}
+
+/* iOS-friendly file input: keep it present & focusable, but visually hidden */
+#fileInput{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 </style></head><body>
 <header><h1>No Bullshit Player</h1><button id="installBtn" class="hidden">Install</button></header>
 <main>
-<section class="uploader"><input id="fileInput" type="file" accept="audio/*" multiple hidden>
-<button id="pickFiles">Add Songs</button>
-<p class="hint">Tip: Put MP3/FLAC/AAC in the Files app (iCloud Drive / On My iPhone). Apple Music/DRM files can’t be imported.</p></section>
+<section class="uploader">
+  <input id="fileInput" type="file" accept="audio/*,.mp3,.m4a,.aac,.flac,.wav" multiple>
+  <label class="btn" for="fileInput">Add Songs</label>
+  <p class="hint">
+    Put your MP3/FLAC/AAC/WAV in the <strong>Files</strong> app (iCloud Drive or “On My iPhone”).<br>
+    You can’t import from Apple Music/DRM-protected tracks.
+  </p>
+  <div id="msg" class="hint"></div>
+</section>
 <section class="now-playing"><div id="npTitle">Nothing playing</div>
-<div class="controls"><button id="prevBtn">⏮</button><button id="playPauseBtn">▶️</button><button id="nextBtn">⏭</button></div>
-<input id="seek" type="range" min="0" max="100" value="0"><div class="time"><span id="cur">0:00</span><span id="dur">0:00</span></div>
-<audio id="player" preload="metadata" playsinline></audio></section>
+  <div class="controls"><button id="prevBtn">⏮</button><button id="playPauseBtn">▶️</button><button id="nextBtn">⏭</button></div>
+  <input id="seek" type="range" min="0" max="100" value="0">
+  <div class="time"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+  <audio id="player" preload="metadata" playsinline></audio>
+</section>
 <section class="library"><h2>Your Library</h2><ul id="trackList"></ul><button id="clearBtn">Clear Library</button></section>
 </main><footer><small>Private, ad-free, offline. Your songs stay on this device.</small></footer>
 <script>
 const dbName='mp3pwa-db',storeName='tracks';let db,playlist=[],currentIndex=-1;
 const player=document.getElementById('player'),trackList=document.getElementById('trackList'),npTitle=document.getElementById('npTitle'),
-playPauseBtn=document.getElementById('playPauseBtn'),seek=document.getElementById('seek');let deferredPrompt;const installBtn=document.getElementById('installBtn');
+playPauseBtn=document.getElementById('playPauseBtn'),seek=document.getElementById('seek'),msg=document.getElementById('msg');let deferredPrompt;const installBtn=document.getElementById('installBtn');
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;installBtn.classList.remove('hidden');});
 installBtn?.addEventListener('click',async()=>{if(deferredPrompt){deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;installBtn.classList.add('hidden');}});
+function tip(t){msg.textContent=t;}
 function openDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(dbName,1);r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(storeName)){d.createObjectStore(storeName,{keyPath:'id',autoIncrement:true}).createIndex('name','name');}};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 async function init(){db=await openDB();await loadAll();renderList();}
 async function loadAll(){playlist=[];await new Promise((res,rej)=>{const tx=db.transaction(storeName,'readonly');const s=tx.objectStore(storeName);const q=s.openCursor();q.onsuccess=e=>{const c=e.target.result;if(c){const v=c.value;playlist.push({id:v.id,name:v.name,type:v.type,size:v.size,lastModified:v.lastModified});c.continue();} else res();};q.onerror=()=>rej(q.error);});}
@@ -55,17 +67,20 @@ document.getElementById('nextBtn').addEventListener('click',()=>playNext(1));
 playPauseBtn.addEventListener('click',()=>{if(player.paused)player.play();else player.pause();});
 player.addEventListener('play',()=>{playPauseBtn.textContent='⏸';});player.addEventListener('pause',()=>{playPauseBtn.textContent='▶️';});
 player.addEventListener('loadedmetadata',()=>{seek.max=Math.floor(player.duration)||100;document.getElementById('dur').textContent=fmt(player.duration||0);});
-player.addEventListener('timeupdate',()=>{seek.value=Math.floor(player.currentTime)||0;document.getElementById('cur').textContent=fmt(player.currentTime||0);});
+player.addEventListener('timeupdate',()=>{seek.value=Math.floor(player.currentTime)||0;document.getElementById('cur').textContent=fmt(player.currentTime)||0;});
 seek.addEventListener('input',()=>{player.currentTime=Number(seek.value)||0;});player.addEventListener('ended',()=>playNext(1));
 function fmt(s){s=Math.floor(s);const m=Math.floor(s/60),sec=s%60;return `${m}:${sec.toString().padStart(2,'0')}`;} 
-document.getElementById('pickFiles').addEventListener('click',()=>{document.getElementById('fileInput').click();});
-document.getElementById('fileInput').addEventListener('change',async e=>{const files=Array.from(e.target.files||[]);if(!files.length)return;
-for(const f of files){await addFile(f);}await loadAll();renderList();if(currentIndex===-1&&playlist.length>0)playAt(0);e.target.value='';});
+// Import files via label+input (iOS friendly)
+const fileInput=document.getElementById('fileInput');
+fileInput.addEventListener('change',async e=>{const files=Array.from(e.target.files||[]);if(!files.length){tip('No files selected. Use the Files app — not Apple Music — then try again.');return;}
+let ok=0,fail=0;for(const f of files){try{await addFile(f);ok++;}catch(err){console.error(err);fail++;}}
+await loadAll();renderList();if(currentIndex===-1&&playlist.length>0)playAt(0);e.target.value='';
+if(ok>0 && fail===0) tip(`Imported ${ok} file(s).`); else if(ok>0) tip(`Imported ${ok} file(s), ${fail} failed.`); else tip('No files imported.');});
 function addFile(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>{const blob=new Blob([r.result],{type:file.type||'audio/mpeg'});
 const rec={name:file.name,type:file.type,size:file.size,lastModified:file.lastModified,blob};const tx=db.transaction(storeName,'readwrite');const q=tx.objectStore(storeName).add(rec);q.onsuccess=()=>res();q.onerror=()=>rej(q.error);};r.onerror=()=>rej(r.error);r.readAsArrayBuffer(file);});}
 function removeTrack(id){const tx=db.transaction(storeName,'readwrite');tx.objectStore(storeName).delete(id).onsuccess=async()=>{await loadAll();renderList();};}
 document.getElementById('clearBtn').addEventListener('click',()=>{if(!confirm('Remove all imported songs from this device?'))return;
-const tx=db.transaction(storeName,'readwrite');tx.objectStore(storeName).clear().onsuccess=()=>{playlist=[];currentIndex=-1;renderList();npTitle.textContent='Nothing playing';player.removeAttribute('src');player.load();};});
+const tx=db.transaction(storeName,'readwrite');tx.objectStore(storeName).clear().onsuccess=()=>{playlist=[];currentIndex=-1;renderList();npTitle.textContent='Nothing playing';player.removeAttribute('src');player.load();tip('Library cleared.');};});
 if('serviceWorker'in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js');});}
 init();
 </script></body></html>
