@@ -1,6 +1,6 @@
 {
-  "name": "My Offline MP3 Player",
-  "short_name": "MP3 Player",
+  "name": "No Bullshit Player",
+  "short_name": "NB Player",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#1b1026",
