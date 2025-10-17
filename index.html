@@ -1,1 +1,46 @@
-<!doctype html><title>No Bullshit Player</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NBP Cleanup Test</title>
+<style>
+body {
+  background:#1b1026;
+  color:#fff;
+  font-family:system-ui,sans-serif;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+  text-align:center;
+}
+button {
+  background:#782052;
+  color:#fff;
+  border:none;
+  padding:12px 20px;
+  border-radius:8px;
+  font-size:1em;
+  margin-top:20px;
+}
+</style>
+</head>
+<body>
+<h2>NBP Cache Cleaner</h2>
+<p>This will remove any old service worker that may be causing blank pages.</p>
+<button id="clean">Unregister Service Worker</button>
+<script>
+document.getElementById('clean').onclick = async () => {
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for (const reg of regs) await reg.unregister();
+    alert('All service workers unregistered! Please refresh the page.');
+  } else {
+    alert('No service worker support found.');
+  }
+};
+</script>
+</body>
+</html>
