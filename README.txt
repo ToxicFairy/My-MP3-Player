@@ -1,1 +1,1 @@
-NBP v8.4.4 — Upload all files to repo root. Use ?v=444 or ?nosw if needed.
+NBP v8.4.4 Final — upload all files to repo root; use ?v=844 or ?nosw once if cached.
